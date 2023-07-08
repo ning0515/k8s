@@ -400,7 +400,9 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	}
 
 	// install legacy rest storage
-
+	//这里是老API的加载
+	//DefaultLegacyAPIPrefix = "/api"  老API
+	//APIGroupPrefix = "/apis" 新API
 	if err := m.InstallLegacyAPI(&c, c.GenericConfig.RESTOptionsGetter); err != nil {
 		return nil, err
 	}
@@ -443,6 +445,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		eventsrest.RESTStorageProvider{TTL: c.ExtraConfig.EventTTL},
 		resourcerest.RESTStorageProvider{},
 	}
+	//这里对每一种restStorageProviders装载的新的APIGroup
 	if err := m.InstallAPIs(c.ExtraConfig.APIResourceConfigSource, c.GenericConfig.RESTOptionsGetter, restStorageProviders...); err != nil {
 		return nil, err
 	}
@@ -579,7 +582,7 @@ func labelAPIServerHeartbeatFunc(identity string) lease.ProcessLeaseFunc {
 // InstallLegacyAPI will install the legacy APIs for the restStorageProviders if they are enabled.
 func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.RESTOptionsGetter) error {
 	legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider{
-		StorageFactory:              c.ExtraConfig.StorageFactory,
+		StorageFactory:              c.ExtraConfig.StorageFactory, //对接etcd的关键
 		ProxyTransport:              c.ExtraConfig.ProxyTransport,
 		KubeletClientConfig:         c.ExtraConfig.KubeletClientConfig,
 		EventTTL:                    c.ExtraConfig.EventTTL,
@@ -591,7 +594,7 @@ func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generi
 		ExtendExpiration:            c.ExtraConfig.ExtendExpiration,
 		ServiceAccountMaxExpiration: c.ExtraConfig.ServiceAccountMaxExpiration,
 		APIAudiences:                c.GenericConfig.Authentication.APIAudiences,
-		Informers:                   c.ExtraConfig.VersionedInformers,
+		Informers:                   c.ExtraConfig.VersionedInformers, //informer
 	}
 	legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(c.ExtraConfig.APIResourceConfigSource, restOptionsGetter)
 	if err != nil {
@@ -616,7 +619,7 @@ func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generi
 	}
 	m.GenericAPIServer.AddPostStartHookOrDie(controllerName, bootstrapController.PostStartHook)
 	m.GenericAPIServer.AddPreShutdownHookOrDie(controllerName, bootstrapController.PreShutdownHook)
-
+	//重要的装载步骤，这里为url为/api的老api配置了APIGroup
 	if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.DefaultLegacyAPIPrefix, &apiGroupInfo); err != nil {
 		return fmt.Errorf("error in registering group versions: %v", err)
 	}

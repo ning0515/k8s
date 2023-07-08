@@ -95,6 +95,7 @@ func init() {
 func NewAPIServerCommand() *cobra.Command {
 	s := options.NewServerRunOptions()
 	cmd := &cobra.Command{
+		//根据cmd.Name()函数，Use里面的第一个单词就是cmd的FlagSet的name,这里是kube-apiserver
 		Use: "kube-apiserver",
 		Long: `The Kubernetes API server validates and configures data
 for the api objects which include pods, services, replicationcontrollers, and
@@ -103,6 +104,7 @@ cluster's shared state through which all other components interact.`,
 
 		// stop printing usage when the command errors
 		SilenceUsage: true,
+		//RunE之前前置的设置
 		PersistentPreRunE: func(*cobra.Command, []string) error {
 			// silence client-go warnings.
 			// kube-apiserver loopback clients should not log self-issued warnings.
@@ -121,7 +123,7 @@ cluster's shared state through which all other components interact.`,
 			cliflag.PrintFlags(fs)
 
 			// set default options
-			completedOptions, err := Complete(s)
+			completedOptions, err := Complete(s) //解析完命令行参数以后，为s增加默认值
 			if err != nil {
 				return err
 			}
@@ -134,6 +136,7 @@ cluster's shared state through which all other components interact.`,
 			utilfeature.DefaultMutableFeatureGate.AddMetrics()
 			return Run(completedOptions, genericapiserver.SetupSignalHandler())
 		},
+		//检验所有的args是否符合要求，apiserver不希望有无flag的参数
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
 				if len(arg) > 0 {
@@ -144,13 +147,13 @@ cluster's shared state through which all other components interact.`,
 		},
 	}
 
-	fs := cmd.Flags()
+	fs := cmd.Flags() //返回一个FlagSet的指针给fs，实际上fs就是cmd的FlagSet的指针
 	namedFlagSets := s.Flags()
 	verflag.AddFlags(namedFlagSets.FlagSet("global"))
 	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name(), logs.SkipLoggingConfigurationFlags())
 	options.AddCustomGlobalFlags(namedFlagSets.FlagSet("generic"))
 	for _, f := range namedFlagSets.FlagSets {
-		fs.AddFlagSet(f)
+		fs.AddFlagSet(f) //把s里面的flagset加入到cmd里面返回，让cobra可以解析s里面定义的各种参数
 	}
 
 	cols, _, _ := term.TerminalSize(cmd.OutOrStdout())
@@ -180,6 +183,7 @@ func Run(completeOptions completedServerRunOptions, stopCh <-chan struct{}) erro
 }
 
 // CreateServerChain creates the apiservers connected via delegation.
+// apiserver链通过delegation连接，从外向内依次是aggregator->kubeAPIServer->apiExtensionsServer->notFoundHandler
 func CreateServerChain(completedOptions completedServerRunOptions) (*aggregatorapiserver.APIAggregator, error) {
 	kubeAPIServerConfig, serviceResolver, pluginInitializer, err := CreateKubeAPIServerConfig(completedOptions)
 	if err != nil {
