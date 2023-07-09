@@ -70,11 +70,13 @@ type APIServerHandler struct {
 // It is normally used to apply filtering like authentication and authorization
 type HandlerChainBuilderFn func(apiHandler http.Handler) http.Handler
 
+// 第四个参数，notFoundHandler实际上是指当前server处理不了，就交给下一级server的director
 func NewAPIServerHandler(name string, s runtime.NegotiatedSerializer, handlerChainBuilder HandlerChainBuilderFn, notFoundHandler http.Handler) *APIServerHandler {
 	//用于处理所有非gorestful处理的请求
 	nonGoRestfulMux := mux.NewPathRecorderMux(name)
 	if notFoundHandler != nil {
 		//director的nonGoRestful无法处理时，就交给delegateTarget的director去处理
+		//把下个server的director设置成notfoundHandler
 		nonGoRestfulMux.NotFoundHandler(notFoundHandler)
 	}
 	//用于处理gorestful请求
@@ -87,7 +89,7 @@ func NewAPIServerHandler(name string, s runtime.NegotiatedSerializer, handlerCha
 	gorestfulContainer.ServiceErrorHandler(func(serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
 		serviceErrorHandler(s, serviceErr, request, response)
 	})
-	//director相应所有的请求
+	//director响应所有的请求
 	director := director{
 		name:               name,
 		goRestfulContainer: gorestfulContainer,
@@ -95,7 +97,8 @@ func NewAPIServerHandler(name string, s runtime.NegotiatedSerializer, handlerCha
 	}
 
 	return &APIServerHandler{
-		FullHandlerChain:   handlerChainBuilder(director),
+		FullHandlerChain: handlerChainBuilder(director), //实际上APIServer的ServeHttp会被转给FullHandlerChain
+		//而FullHandlerChain实际上就是通过装饰器方法包装后（包装了一些鉴权机制等）的director
 		GoRestfulContainer: gorestfulContainer,
 		NonGoRestfulMux:    nonGoRestfulMux,
 		Director:           director,
@@ -126,6 +129,7 @@ func (d director) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	path := req.URL.Path
 
 	// check to see if our webservices want to claim this path
+	//如果可以处理请求就直接处理
 	for _, ws := range d.goRestfulContainer.RegisteredWebServices() {
 		switch {
 		case ws.RootPath() == "/apis":
@@ -153,6 +157,7 @@ func (d director) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// if we didn't find a match, then we just skip gorestful altogether
+	//如果不能处理，就把req交给nonGoRestfulMux处理，实际上也就是下个server的director
 	klog.V(5).Infof("%v: %v %q satisfied by nonGoRestful", d.name, req.Method, path)
 	d.nonGoRestfulMux.ServeHTTP(w, req)
 }
