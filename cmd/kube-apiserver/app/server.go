@@ -76,6 +76,8 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/capabilities"
+	//这个导入涉及到scheme,比较重要
+	//k8s.io/kubernetes/pkg/controlplane/import_known_versions.go这个文件下面导入了所有的apigroups
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
@@ -113,7 +115,7 @@ cluster's shared state through which all other components interact.`,
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			verflag.PrintAndExitIfRequested()
-			fs := cmd.Flags()
+			fs := cmd.Flags() //首先接收用户的输入
 
 			// Activate logging as soon as possible, after that
 			// show flags with the final logging configuration.
@@ -123,12 +125,12 @@ cluster's shared state through which all other components interact.`,
 			cliflag.PrintFlags(fs)
 
 			// set default options
-			completedOptions, err := Complete(s) //解析完命令行参数以后，为s增加默认值
+			completedOptions, err := Complete(s) //把输入转为，options.解析完命令行参数以后，为s增加默认值
 			if err != nil {
 				return err
 			}
 
-			// validate options
+			// validate options，验证
 			if errs := completedOptions.Validate(); len(errs) != 0 {
 				return utilerrors.NewAggregate(errs)
 			}

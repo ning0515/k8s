@@ -392,7 +392,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 
 	return &Config{
 		Serializer:                     codecs,
-		BuildHandlerChainFunc:          DefaultBuildHandlerChain,
+		BuildHandlerChainFunc:          DefaultBuildHandlerChain, //这个很重要handlerChainBuilder实际调用了这里
 		NonLongRunningRequestWaitGroup: new(utilwaitgroup.SafeWaitGroup),
 		WatchRequestWaitGroup:          &utilwaitgroup.RateLimitedSafeWaitGroup{},
 		LegacyAPIGroupPrefixes:         sets.NewString(DefaultLegacyAPIPrefix),
@@ -662,6 +662,7 @@ func (c *RecommendedConfig) Complete() CompletedConfig {
 // New creates a new server which logically combines the handling chain with the passed server.
 // name is used to differentiate for logging. The handler chain in particular can be difficult as it starts delegating.
 // delegationTarget may not be nil.
+// 创建GenericServer的关键方法
 func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*GenericAPIServer, error) {
 	if c.Serializer == nil {
 		return nil, fmt.Errorf("Genericapiserver.New() called with config.Serializer == nil")
@@ -681,8 +682,11 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	if c.DebugSocketPath != "" {
 		debugSocket = routes.NewDebugSocket(c.DebugSocketPath)
 	}
-
-	apiServerHandler := NewAPIServerHandler(name, c.Serializer, handlerChainBuilder, delegationTarget.UnprotectedHandler())
+	//这个handler非常重要，构建了响应http request的路由
+	apiServerHandler := NewAPIServerHandler(name,
+		c.Serializer,
+		handlerChainBuilder,
+		delegationTarget.UnprotectedHandler() /*实际上是genericServer的director*/)
 
 	s := &GenericAPIServer{
 		discoveryAddresses:             c.DiscoveryAddresses,
@@ -873,7 +877,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 
 	s.listedPathProvider = routes.ListedPathProviders{s.listedPathProvider, delegationTarget}
 
-	installAPI(s, c.Config)
+	installAPI(s, c.Config) //装载APIGroup
 
 	// use the UnprotectedHandler from the delegation target to ensure that we don't attempt to double authenticator, authorize,
 	// or some other part of the filter chain in delegation cases.
@@ -893,6 +897,7 @@ func BuildHandlerChainWithStorageVersionPrecondition(apiHandler http.Handler, c 
 	return DefaultBuildHandlerChain(handler, c)
 }
 
+// 利用装饰器模式，把所有request的前置处理都包在handler外层，请求来的时候就先走外层
 func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler := filterlatency.TrackCompleted(apiHandler)
 	handler = genericapifilters.WithAuthorization(handler, c.Authorization.Authorizer, c.Serializer)

@@ -353,7 +353,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	if reflect.DeepEqual(c.ExtraConfig.KubeletClientConfig, kubeletclient.KubeletClientConfig{}) {
 		return nil, fmt.Errorf("Master.New() called with empty config.KubeletClientConfig")
 	}
-
+	//从新建MasterAPIServer追进来，这里新建了genericServer
 	s, err := c.GenericConfig.New("kube-apiserver", delegationTarget)
 	if err != nil {
 		return nil, err

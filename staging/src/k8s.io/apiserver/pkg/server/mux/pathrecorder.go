@@ -80,6 +80,7 @@ type prefixHandler struct {
 }
 
 // NewPathRecorderMux creates a new PathRecorderMux
+// 自制了一个mux
 func NewPathRecorderMux(name string) *PathRecorderMux {
 	ret := &PathRecorderMux{
 		name:            name,

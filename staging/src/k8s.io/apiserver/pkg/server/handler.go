@@ -71,11 +71,13 @@ type APIServerHandler struct {
 type HandlerChainBuilderFn func(apiHandler http.Handler) http.Handler
 
 func NewAPIServerHandler(name string, s runtime.NegotiatedSerializer, handlerChainBuilder HandlerChainBuilderFn, notFoundHandler http.Handler) *APIServerHandler {
+	//用于处理所有非gorestful处理的请求
 	nonGoRestfulMux := mux.NewPathRecorderMux(name)
 	if notFoundHandler != nil {
+		//director的nonGoRestful无法处理时，就交给delegateTarget的director去处理
 		nonGoRestfulMux.NotFoundHandler(notFoundHandler)
 	}
-
+	//用于处理gorestful请求
 	gorestfulContainer := restful.NewContainer()
 	gorestfulContainer.ServeMux = http.NewServeMux()
 	gorestfulContainer.Router(restful.CurlyRouter{}) // e.g. for proxy/{kind}/{name}/{*}
@@ -85,7 +87,7 @@ func NewAPIServerHandler(name string, s runtime.NegotiatedSerializer, handlerCha
 	gorestfulContainer.ServiceErrorHandler(func(serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
 		serviceErrorHandler(s, serviceErr, request, response)
 	})
-
+	//director相应所有的请求
 	director := director{
 		name:               name,
 		goRestfulContainer: gorestfulContainer,
@@ -119,6 +121,7 @@ type director struct {
 	nonGoRestfulMux    *mux.PathRecorderMux
 }
 
+// http请求的处理在这里
 func (d director) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	path := req.URL.Path
 
