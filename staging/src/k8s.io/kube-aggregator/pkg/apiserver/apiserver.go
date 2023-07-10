@@ -410,7 +410,7 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 			return nil
 		})
 	}
-
+	//制作openapi的endpoint  制作 server healthz LiveZ readyZ等endpoints方便外部检查apiserver的状态
 	prepared := s.GenericAPIServer.PrepareRun()
 
 	// delay OpenAPI setup until the delegate had a chance to setup their OpenAPI handlers

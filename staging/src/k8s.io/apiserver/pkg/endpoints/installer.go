@@ -188,6 +188,7 @@ func (a *APIInstaller) Install() ([]metav1.APIResource, []*storageversion.Resour
 	ws := a.newWebService()
 
 	// Register the paths in a deterministic (sorted) order to get a deterministic swagger spec.
+	//*APIGroupVersion.Storage存储了所有的url
 	paths := make([]string, len(a.group.Storage))
 	var i int = 0
 	for path := range a.group.Storage {
@@ -299,9 +300,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 	defaultVersionedObject := indirectArbitraryPointer(versionedPtr)
 	kind := fqKindToRegister.Kind
+	//确定是否是子资源
 	isSubresource := len(subresource) > 0
 
 	// If there is a subresource, namespace scoping is defined by the parent resource
+	//确定是否区分namespace
 	var namespaceScoped bool
 	if isSubresource {
 		parentStorage, ok := a.group.Storage[resource]
@@ -323,6 +326,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 
 	// what verbs are supported by the storage, used to know what verbs we support per path
+	//根据传入的storage对象实现的接口，确定支持的各种verbs
 	creater, isCreater := storage.(rest.Creater)
 	namedCreater, isNamedCreater := storage.(rest.NamedCreater)
 	lister, isLister := storage.(rest.Lister)
@@ -358,7 +362,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 		versionedList = indirectArbitraryPointer(versionedListPtr)
 	}
-
+	//创建各种Options
 	versionedListOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("ListOptions"))
 	if err != nil {
 		return nil, nil, err
@@ -473,7 +477,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		// All listers must implement TableProvider
 		return nil, nil, fmt.Errorf("%q must implement TableConvertor", resource)
 	}
-
+	//生成apiResource
 	var apiResource metav1.APIResource
 	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionHash) &&
 		isStorageVersionProvider &&
@@ -512,6 +516,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
 		// Add actions at the resource path: /api/apiVersion/resource
+		//根据前面类型转换得到的数据，确定支持的action，然后把结果为true的actions加入到actionsList中
 		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, false}, isLister)
 		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, false}, isCreater)
 		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer, false}, isCollectionDeleter)
@@ -592,12 +597,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		storageVersionProvider.StorageVersion() != nil {
 
 		versioner := storageVersionProvider.StorageVersion()
+		//写入etcd中使用的版本
 		encodingGVK, err := getStorageVersionKind(versioner, storage, a.group.Typer)
 		if err != nil {
 			return nil, nil, err
 		}
 		decodableVersions := []schema.GroupVersion{}
 		if a.group.ConvertabilityChecker != nil {
+			//从etcd中读取时使用的version
 			decodableVersions = a.group.ConvertabilityChecker.VersionsForGroupKind(fqKindToRegister.GroupKind())
 		}
 		resourceInfo = &storageversion.ResourceInfo{
@@ -637,11 +644,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			return nil, nil, fmt.Errorf("all serializers in the group Serializer must have MediaTypeType and MediaTypeSubType set: %s", s.MediaType)
 		}
 	}
+	//根据Serializer，得出支持的MediaType 如json yaml html
 	mediaTypes, streamMediaTypes := negotiation.MediaTypesForSerializer(a.group.Serializer)
 	allMediaTypes := append(mediaTypes, streamMediaTypes...)
 	ws.Produces(allMediaTypes...)
 
 	kubeVerbs := map[string]struct{}{}
+	//把前面得到的各种信息，都放入reqScope中
 	reqScope := handlers.RequestScope{
 		Serializer:      a.group.Serializer,
 		ParameterCodec:  a.group.ParameterCodec,
@@ -697,7 +706,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			return nil, nil, fmt.Errorf("failed to create field manager: %v", err)
 		}
 	}
-
+	//逐个处理Actions list中的action,基于reqScope等信息，为他们生成route并注册到webservice中
 	for _, action := range actions {
 		producedObject := storageMeta.ProducesObject(action.Verb)
 		if producedObject == nil {
@@ -768,10 +777,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				warnings = append(warnings, deprecation.WarningMessage(versionedPtrWithGVK))
 			}
 		}
-
+		//针对每一个action都会向目标中加入一个route
 		switch action.Verb {
 		case "GET": // Get a resource.
-			var handler restful.RouteFunction
+			var handler restful.RouteFunction //这个handler代表当想执行GET操作的时候由这里处理
 			if isGetterWithOptions {
 				handler = restfulGetResourceWithOptions(getterWithOptions, reqScope, isSubresource)
 			} else {
@@ -780,6 +789,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 			if needOverride {
 				// need change the reported verb
+				//包装所有获取观测数据的方法-装饰器模式
 				handler = metrics.InstrumentRouteFunc(verbOverrider.OverrideMetricsVerb(action.Verb), group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, handler)
 			} else {
 				handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, handler)

@@ -492,6 +492,7 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 // |                       listenerStoppedCh
 // |                               |
 // |      HTTPServerStoppedListening (httpServerStoppedListeningCh)
+// 设置Server生命周期的状态
 func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	delayedStopCh := s.lifecycleSignals.AfterShutdownDelayDuration
 	shutdownInitiatedCh := s.lifecycleSignals.ShutdownInitiated
@@ -574,7 +575,7 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 			return fmt.Errorf("failed to run the audit backend: %v", err)
 		}
 	}
-
+	//触发 http server的启动触发post start hooks 的执行
 	stoppedCh, listenerStoppedCh, err := s.NonBlockingRun(stopHttpServerCh, shutdownTimeout)
 	if err != nil {
 		return err
@@ -711,6 +712,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}, shutdow
 	var listenerStoppedCh <-chan struct{}
 	if s.SecureServingInfo != nil && s.Handler != nil {
 		var err error
+		//HTTP2.0设置，TLS设置，启动Server
 		stoppedCh, listenerStoppedCh, err = s.SecureServingInfo.Serve(s.Handler, shutdownTimeout, internalStopCh)
 		if err != nil {
 			close(internalStopCh)

@@ -79,6 +79,7 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 	}
 
 	if s.ClientCA != nil || s.Cert != nil || len(s.SNICerts) > 0 {
+		//制作了一个controller 当证书发生变化时，会应用最新的证书
 		dynamicCertificateController := dynamiccertificates.NewDynamicServingCertificateController(
 			tlsConfig,
 			s.ClientCA,
@@ -140,6 +141,7 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 		if err := dynamicCertificateController.RunOnce(); err != nil {
 			klog.Warningf("Initial population of dynamic certificates failed: %v", err)
 		}
+		//启动了一个controller
 		go dynamicCertificateController.Run(1, stopCh)
 
 		tlsConfig.GetConfigForClient = dynamicCertificateController.GetConfigForClient
@@ -156,12 +158,12 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 	if s.Listener == nil {
 		return nil, nil, fmt.Errorf("listener must not be nil")
 	}
-
+	//返回tls配置
 	tlsConfig, err := s.tlsConfig(stopCh)
 	if err != nil {
 		return nil, nil, err
 	}
-
+	//先创建一个http server
 	secureServer := &http.Server{
 		Addr:           s.Listener.Addr().String(),
 		Handler:        handler,
@@ -208,6 +210,7 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 	secureServer.ErrorLog = tlsErrorLogger
 
 	klog.Infof("Serving securely on %s", secureServer.Addr)
+	//利用RunServer方法启动secureServer
 	return RunServer(secureServer, s.Listener, shutdownTimeout, stopCh)
 }
 
@@ -246,7 +249,7 @@ func RunServer(
 		if server.TLSConfig != nil {
 			listener = tls.NewListener(listener, server.TLSConfig)
 		}
-
+		//server启动
 		err := server.Serve(listener)
 
 		msg := fmt.Sprintf("Stopped listening on %s", ln.Addr().String())

@@ -175,7 +175,7 @@ func Run(completeOptions completedServerRunOptions, stopCh <-chan struct{}) erro
 	if err != nil {
 		return err
 	}
-
+	//注册openapi相关的controller到post start hook中
 	prepared, err := server.PrepareRun()
 	if err != nil {
 		return err
