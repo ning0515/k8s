@@ -933,7 +933,7 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		Namer:                 runtime.Namer(meta.NewAccessor()),
 
 		EquivalentResourceRegistry: s.EquivalentResourceRegistry,
-
+		//这里拿到了admissionControl
 		Admit:             s.admissionControl,
 		MinRequestTimeout: s.minRequestTimeout,
 		Authorizer:        s.Authorizer,

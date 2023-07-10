@@ -535,7 +535,14 @@ func (e *Store) deleteWithoutFinalizers(ctx context.Context, name, key string, o
 // Update performs an atomic update and set of the object. Returns the result of the update
 // or an error. If the registry allows create-on-update, the create flow will be executed.
 // A bool is returned along with the object and any errors, to indicate object creation.
-func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+func (e *Store) Update(ctx context.Context,
+	name string,
+	objInfo rest.UpdatedObjectInfo,
+	createValidation rest.ValidateObjectFunc,
+	//如果不是空，就会在代码中调用
+	updateValidation rest.ValidateObjectUpdateFunc,
+	forceAllowCreate bool,
+	options *metav1.UpdateOptions) (runtime.Object, bool, error) {
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
 		return nil, false, err

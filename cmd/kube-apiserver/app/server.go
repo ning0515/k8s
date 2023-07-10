@@ -472,7 +472,7 @@ func buildGenericConfig(
 		lastErr = fmt.Errorf("failed to create admission plugin initializer: %v", err)
 		return
 	}
-
+	//这里的Admission就是所有的内建Plugin
 	err = s.Admission.ApplyTo(
 		genericConfig,
 		versionedInformers,

@@ -165,7 +165,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 				return newObj, nil
 			})
 		}
-
+		//首先用mutation的admission来构造transformer,用于更改被更新的Object
 		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
 			transformers = append(transformers, func(ctx context.Context, newObj, oldObj runtime.Object) (runtime.Object, error) {
 				isNotZeroObject, err := hasUID(oldObj)
@@ -217,11 +217,13 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			obj, created, err := r.Update(
 				ctx,
 				name,
+				//在storage object的Update方法前调用transformers，完成mutation任务
 				rest.DefaultUpdatedObjectInfo(obj, transformers...),
 				withAuthorization(rest.AdmissionToValidateObjectFunc(
 					admit,
 					admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, updateToCreateOptions(options), dryrun.IsDryRun(options.DryRun), userInfo), scope),
 					scope.Authorizer, createAuthorizerAttributes),
+				//admission的validate逻辑，被做成了回调函数，在调用upsate的过程中会执行validate
 				rest.AdmissionToValidateObjectUpdateFunc(
 					admit,
 					admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, options, dryrun.IsDryRun(options.DryRun), userInfo), scope),

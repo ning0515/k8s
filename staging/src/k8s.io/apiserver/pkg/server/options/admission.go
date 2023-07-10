@@ -135,7 +135,7 @@ func (a *AdmissionOptions) ApplyTo(
 	if informers == nil {
 		return fmt.Errorf("admission depends on a Kubernetes core API shared informer, it cannot be nil")
 	}
-
+	//获取到所有使能的plugin的名字
 	pluginNames := a.enabledPluginNames()
 
 	pluginsConfigProvider, err := admission.ReadAdmissionConfiguration(pluginNames, a.ConfigFile, configScheme)
@@ -151,15 +151,17 @@ func (a *AdmissionOptions) ApplyTo(
 	if err != nil {
 		return err
 	}
+	//把这些名字做成实体
 	genericInitializer := initializer.New(clientset, dynamicClient, informers, c.Authorization.Authorizer, features, c.DrainedNotify())
 	initializersChain := admission.PluginInitializers{genericInitializer}
+	//然后串成一个链
 	initializersChain = append(initializersChain, pluginInitializers...)
 
 	admissionChain, err := a.Plugins.NewFromPlugins(pluginNames, pluginsConfigProvider, initializersChain, a.Decorators)
 	if err != nil {
 		return err
 	}
-
+	//最后这个链会被放到Server.Config.AdmissionControl
 	c.AdmissionControl = admissionmetrics.WithStepMetrics(admissionChain)
 	return nil
 }

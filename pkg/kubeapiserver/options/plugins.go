@@ -63,18 +63,20 @@ import (
 )
 
 // AllOrderedPlugins is the list of all the plugins in order.
+// 内建的Plugin,只能启用或者禁用
 var AllOrderedPlugins = []string{
-	admit.PluginName,                        // AlwaysAdmit
-	autoprovision.PluginName,                // NamespaceAutoProvision
-	lifecycle.PluginName,                    // NamespaceLifecycle
-	exists.PluginName,                       // NamespaceExists
-	scdeny.PluginName,                       // SecurityContextDeny
-	antiaffinity.PluginName,                 // LimitPodHardAntiAffinityTopology
-	limitranger.PluginName,                  // LimitRanger
-	serviceaccount.PluginName,               // ServiceAccount
-	noderestriction.PluginName,              // NodeRestriction
-	nodetaint.PluginName,                    // TaintNodesByCondition
-	alwayspullimages.PluginName,             // AlwaysPullImages
+	admit.PluginName,            // AlwaysAdmit
+	autoprovision.PluginName,    // NamespaceAutoProvision
+	lifecycle.PluginName,        // NamespaceLifecycle
+	exists.PluginName,           // NamespaceExists
+	scdeny.PluginName,           // SecurityContextDeny
+	antiaffinity.PluginName,     // LimitPodHardAntiAffinityTopology
+	limitranger.PluginName,      // LimitRanger
+	serviceaccount.PluginName,   // ServiceAccount
+	noderestriction.PluginName,  // NodeRestriction
+	nodetaint.PluginName,        // TaintNodesByCondition
+	alwayspullimages.PluginName, // AlwaysPullImages
+	//限制集群中可以跑的镜像,如来自自己的库才可以跑,来避免安全问题
 	imagepolicy.PluginName,                  // ImagePolicyWebhook
 	podsecurity.PluginName,                  // PodSecurity
 	podnodeselector.PluginName,              // PodNodeSelector
@@ -99,11 +101,13 @@ var AllOrderedPlugins = []string{
 	// new admission plugins should generally be inserted above here
 	// webhook, resourcequota, and deny plugins must go at the end
 
+	//在修改request阶段可以做一些操作，比如自己写的webhook,sidecar机制
 	mutatingwebhook.PluginName,           // MutatingAdmissionWebhook
 	validatingadmissionpolicy.PluginName, // ValidatingAdmissionPolicy
-	validatingwebhook.PluginName,         // ValidatingAdmissionWebhook
-	resourcequota.PluginName,             // ResourceQuota
-	deny.PluginName,                      // AlwaysDeny
+	//起到校验的逻辑，可以拓展校验
+	validatingwebhook.PluginName, // ValidatingAdmissionWebhook
+	resourcequota.PluginName,     // ResourceQuota
+	deny.PluginName,              // AlwaysDeny
 }
 
 // RegisterAllAdmissionPlugins registers all admission plugins.
