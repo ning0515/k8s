@@ -48,6 +48,7 @@ type ServiceReference struct {
 // APIServiceSpec contains information for locating and communicating with a server.
 // Only https is supported, though you are able to disable certificate verification.
 type APIServiceSpec struct {
+	//Service指向APIService背后的Server，如果为空就是指本地
 	// Service is a reference to the service for this API server.  It must communicate
 	// on port 443.
 	// If the Service is nil, that means the handling for the API groupversion is handled locally on this server.

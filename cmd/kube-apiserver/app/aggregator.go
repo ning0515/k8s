@@ -67,6 +67,7 @@ func createAggregatorConfig(
 	genericConfig.RESTOptionsGetter = nil
 	// prevent generic API server from installing the OpenAPI handler. Aggregator server
 	// has its own customized OpenAPI handler.
+	//aggregator使用汇总的Spec,所以跳过了APIInstallation
 	genericConfig.SkipOpenAPIInstallation = true
 
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StorageVersionAPI) &&
@@ -103,6 +104,7 @@ func createAggregatorConfig(
 			SharedInformerFactory: externalInformers,
 		},
 		ExtraConfig: aggregatorapiserver.ExtraConfig{
+			//用于调用CustomServer时给出私钥
 			ProxyClientCertFile:       commandOptions.ProxyClientCertFile,
 			ProxyClientKeyFile:        commandOptions.ProxyClientKeyFile,
 			ServiceResolver:           serviceResolver,
@@ -128,8 +130,11 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 	if err != nil {
 		return nil, err
 	}
+	//把APIServer 存储到etcd
 	autoRegistrationController := autoregister.NewAutoRegisterController(aggregatorServer.APIRegistrationInformers.Apiregistration().V1().APIServices(), apiRegistrationClient)
+	//把内建的APIGroup都拿出来放到controller,让controller创建出api resources
 	apiServices := apiServicesToRegister(delegateAPIServer, autoRegistrationController)
+	//把CRD创建出来的Group给controller让controller创建出api resources
 	crdRegistrationController := crdregistration.NewCRDRegistrationController(
 		apiExtensionInformers.Apiextensions().V1().CustomResourceDefinitions(),
 		autoRegistrationController)

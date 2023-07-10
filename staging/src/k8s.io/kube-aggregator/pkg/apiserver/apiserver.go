@@ -195,6 +195,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	if err != nil {
 		return nil, err
 	}
+	//用于监控APIService Object
 	informerFactory := informers.NewSharedInformerFactory(
 		apiregistrationClient,
 		5*time.Minute, // this is effectively used as a refresh interval right now.  Might want to do something nicer later on.
@@ -258,7 +259,8 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", apisHandler)
 	}
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle("/apis/", apisHandler)
-
+	//制作监控APIServices的controller最终会调用APIAggregator.AddAPIService()和APIAggregator.RemoveAPIService()
+	//这两个方法里会注册、取消注册针对特定url的响应函数，这样就可以去响应针对Aggregator Server支持的API Object的请求
 	apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().V1().APIServices(), s)
 	if len(c.ExtraConfig.ProxyClientCertFile) > 0 && len(c.ExtraConfig.ProxyClientKeyFile) > 0 {
 		aggregatorProxyCerts, err := dynamiccertificates.NewDynamicServingContentFromFiles("aggregator-proxy-cert", c.ExtraConfig.ProxyClientCertFile, c.ExtraConfig.ProxyClientKeyFile)
@@ -289,7 +291,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 			return nil
 		})
 	}
-
+	//制作检测Server可用性的controller
 	availableController, err := statuscontrollers.NewAvailableConditionController(
 		informerFactory.Apiregistration().V1().APIServices(),
 		c.GenericConfig.SharedInformerFactory.Core().V1().Services(),
@@ -383,6 +385,8 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 	// add post start hook before generic PrepareRun in order to be before /healthz installation
 	if s.openAPIConfig != nil {
 		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-openapi-controller", func(context genericapiserver.PostStartHookContext) error {
+			//controller的作用就是找到下游的custom server和master server以及extension server周期性的收集
+			//他们支持的OPENAPI的spec，收集完以后形成Aggregator自己的OPEN SPEC去对外提供
 			go s.openAPIAggregationController.Run(context.StopCh)
 			return nil
 		})
@@ -468,7 +472,7 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 		}
 		return nil
 	}
-
+	//制作响应/apis/<group>/<version>开头的响应函数
 	proxyPath := "/apis/" + apiService.Spec.Group + "/" + apiService.Spec.Version
 	// v1. is a special case for the legacy API.  It proxies to a wider set of endpoints.
 	if apiService.Name == legacyAPIServiceName {
@@ -476,6 +480,9 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 	}
 
 	// register the proxy handler
+	//把响应函数交给proxyHandler来处理
+	//如果是本地Server(Master和Extension)支持的API Resource交给delegationServer去处理，即Master
+	//其余request需要Custom Server响应，制作http client去请求对应的Server
 	proxyHandler := &proxyHandler{
 		localDelegate:              s.delegateHandler,
 		proxyCurrentCertKeyContent: s.proxyCurrentCertKeyContent,
@@ -510,6 +517,7 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 	}
 
 	// it's time to register the group aggregation endpoint
+	//制作响应/apis/<group>的请求，会返回所有的version和所有的object
 	groupPath := "/apis/" + apiService.Spec.Group
 	groupDiscoveryHandler := &apiGroupHandler{
 		codecs:    aggregatorscheme.Codecs,

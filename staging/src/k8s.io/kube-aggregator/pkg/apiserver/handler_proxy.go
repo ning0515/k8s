@@ -117,6 +117,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	handlingInfo := value.(proxyHandlingInfo)
+	//先看APIServices是不是内建的和crd的,如果是的话，就交给master
 	if handlingInfo.local {
 		if r.localDelegate == nil {
 			http.Error(w, "", http.StatusNotFound)
@@ -135,7 +136,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		proxyError(w, req, handlingInfo.transportBuildingError.Error(), http.StatusInternalServerError)
 		return
 	}
-
+	//如果不是，拿到http header信息，制作request
 	user, ok := genericapirequest.UserFrom(req.Context())
 	if !ok {
 		proxyError(w, req, "missing user", http.StatusInternalServerError)
@@ -180,6 +181,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		handler.RejectForwardingRedirects = true
 	}
 	utilflowcontrol.RequestDelegated(req.Context())
+	//最后形成一个handler，直接调用这个handler的ServeHTTP方法
 	handler.ServeHTTP(w, newReq)
 }
 

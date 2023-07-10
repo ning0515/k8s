@@ -47,6 +47,7 @@ func createAPIExtensionsConfig(
 ) (*apiextensionsapiserver.Config, error) {
 	// make a shallow copy to let us twiddle a few things
 	// most of the config actually remains the same.  We only need to mess with a couple items related to the particulars of the apiextensions
+	//复用master的config，除了poststarthooks和RESTOptionsGetter
 	genericConfig := kubeAPIServerConfig
 	genericConfig.PostStartHooks = map[string]genericapiserver.PostStartHookConfigEntry{}
 	genericConfig.RESTOptionsGetter = nil
@@ -72,7 +73,7 @@ func createAPIExtensionsConfig(
 		apiextensionsapiserver.Scheme); err != nil {
 		return nil, err
 	}
-
+	//复制master的时候擦掉了这个部分，利用新的etcdOptions做一个新的出来
 	crdRESTOptionsGetter, err := apiextensionsoptions.NewCRDRESTOptionsGetter(etcdOptions)
 	if err != nil {
 		return nil, err
@@ -82,7 +83,7 @@ func createAPIExtensionsConfig(
 	if err != nil {
 		return nil, err
 	}
-
+	//这里也是两个部分，一个是GenericConfig 另一个是extra
 	apiextensionsConfig := &apiextensionsapiserver.Config{
 		GenericConfig: &genericapiserver.RecommendedConfig{
 			Config:                genericConfig,

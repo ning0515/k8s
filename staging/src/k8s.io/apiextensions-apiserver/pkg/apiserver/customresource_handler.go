@@ -235,11 +235,13 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		pathParts := splitPath(requestInfo.Path)
 		// only match /apis/<group>/<version>
 		// only registered under /apis
+		//处理/apis/<group>/<version>这种请求，交给versionDiscoveryHandler处理
 		if len(pathParts) == 3 {
 			r.versionDiscoveryHandler.ServeHTTP(w, req)
 			return
 		}
 		// only match /apis/<group>
+		//处理/apis/<group>，交给groupDiscoveryHandler去处理
 		if len(pathParts) == 2 {
 			r.groupDiscoveryHandler.ServeHTTP(w, req)
 			return
@@ -248,7 +250,8 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		r.delegate.ServeHTTP(w, req)
 		return
 	}
-
+	//如果不是前面两种请求，一定是/apis/<group>/<version>/resource
+	//就要看namespace和请求中的namespace是否一致，如果不一致直接返回
 	crdName := requestInfo.Resource + "." + requestInfo.APIGroup
 	crd, err := r.crdLister.Get(crdName)
 	if apierrors.IsNotFound(err) {
@@ -285,6 +288,7 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// but it becomes "unserved" because another names update leads to a conflict
 	// and EstablishingController wasn't fast enough to put the CRD into the Established condition.
 	// We accept this as the problem is small and self-healing.
+	//还要看condition是否为true,否则返回
 	if !apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.NamesAccepted) &&
 		!apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Established) {
 		r.delegate.ServeHTTP(w, req)
@@ -336,6 +340,7 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		)
 		return
 	}
+	//针对三种类型的资源 status和scale是子资源，或者直接获取resource
 	switch {
 	case subresource == "status" && subresources != nil && subresources.Status != nil:
 		handlerFunc = r.serveStatus(w, req, requestInfo, crdInfo, terminating, supportedTypes)
@@ -351,6 +356,7 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	if handlerFunc != nil {
+		//最后直接调用得到的handler
 		handlerFunc = metrics.InstrumentHandlerFunc(verb, requestInfo.APIGroup, requestInfo.APIVersion, resource, subresource, scope, metrics.APIServerComponent, deprecated, "", handlerFunc)
 		handler := genericfilters.WithWaitGroup(handlerFunc, longRunningFilter, crdInfo.waitGroup)
 		handler.ServeHTTP(w, req)
