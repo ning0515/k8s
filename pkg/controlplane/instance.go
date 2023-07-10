@@ -297,10 +297,11 @@ func (c *Config) createEndpointReconciler() reconcilers.EndpointReconciler {
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
 func (c *Config) Complete() CompletedConfig {
 	cfg := completedConfig{
+		//先将genericconfig补全，extra部分复制
 		c.GenericConfig.Complete(c.ExtraConfig.VersionedInformers),
 		&c.ExtraConfig,
 	}
-
+	//设置service可用的IP范围
 	serviceIPRange, apiServerServiceIP, err := ServiceIPRange(cfg.ExtraConfig.ServiceIPRange)
 	if err != nil {
 		klog.Fatalf("Error determining service IP ranges: %v", err)
@@ -315,6 +316,7 @@ func (c *Config) Complete() CompletedConfig {
 	discoveryAddresses := discovery.DefaultAddresses{DefaultAddress: cfg.GenericConfig.ExternalAddress}
 	discoveryAddresses.CIDRRules = append(discoveryAddresses.CIDRRules,
 		discovery.CIDRRule{IPRange: cfg.ExtraConfig.ServiceIPRange, Address: net.JoinHostPort(cfg.ExtraConfig.APIServerServiceIP.String(), strconv.Itoa(cfg.ExtraConfig.APIServerServicePort))})
+	//找到最优的API Server通讯方式
 	cfg.GenericConfig.DiscoveryAddresses = discoveryAddresses
 
 	if cfg.ExtraConfig.ServiceNodePortRange.Size == 0 {
@@ -358,13 +360,14 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	if err != nil {
 		return nil, err
 	}
-
+	//如果enable了，会把log相关的endpoint注册到container上面
 	if c.ExtraConfig.EnableLogsSupport {
 		routes.Logs{}.Install(s.Handler.GoRestfulContainer)
 	}
 
 	// Metadata and keys are expected to only change across restarts at present,
 	// so we just marshal immediately and serve the cached JSON bytes.
+	//这里制作OpenID元数据，并注册OpenID相关的endpoint,用来获取所用的Provider的信息
 	md, err := serviceaccount.NewOpenIDMetadata(
 		c.ExtraConfig.ServiceAccountIssuerURL,
 		c.ExtraConfig.ServiceAccountJWKSURI,
@@ -391,7 +394,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		}
 	} else {
 		routes.NewOpenIDMetadataServer(md.ConfigJSON, md.PublicKeysetJSON).
-			Install(s.Handler.GoRestfulContainer)
+			Install(s.Handler.GoRestfulContainer) //这里提供了container
 	}
 
 	m := &Instance{
@@ -449,7 +452,8 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	if err := m.InstallAPIs(c.ExtraConfig.APIResourceConfigSource, c.GenericConfig.RESTOptionsGetter, restStorageProviders...); err != nil {
 		return nil, err
 	}
-
+	//当用户自定义了API Server并通过APIService Object加入到了API Server中时，我们需要合并它和APIService各自的authentication信息并写回authentication设置
+	//在kube-system configmaps/extension-apiserver-authentication
 	m.GenericAPIServer.AddPostStartHookOrDie("start-cluster-authentication-info-controller", func(hookContext genericapiserver.PostStartHookContext) error {
 		kubeClient, err := kubernetes.NewForConfig(hookContext.LoopbackClientConfig)
 		if err != nil {
@@ -479,6 +483,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 				if err := controller.RunOnce(ctx); err != nil {
 					runtime.HandleError(err)
 				}
+				//启动了controller协程来维护证书
 				go controller.Run(ctx, 1)
 			}
 		}
@@ -488,6 +493,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	})
 
 	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.APIServerIdentity) {
+		//为每个API Server创建一个lease(租约)，并在超出租期没有续约后清除这些lease，引入Identity的原因是在HA集群中，需要用到可用的API Server列表
 		m.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-identity-lease-controller", func(hookContext genericapiserver.PostStartHookContext) error {
 			kubeClient, err := kubernetes.NewForConfig(hookContext.LoopbackClientConfig)
 			if err != nil {
