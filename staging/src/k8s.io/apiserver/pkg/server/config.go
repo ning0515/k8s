@@ -686,7 +686,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	apiServerHandler := NewAPIServerHandler(name,
 		c.Serializer,
 		handlerChainBuilder,
-		delegationTarget.UnprotectedHandler() /*实际上是genericServer的director*/)
+		delegationTarget.UnprotectedHandler() /*实际上是genericServer的director，这里的UnprotectedHandler是处理的下一环，这里是没有外层的filter的*/)
 
 	s := &GenericAPIServer{
 		discoveryAddresses:             c.DiscoveryAddresses,
