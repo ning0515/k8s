@@ -922,7 +922,8 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		GroupVersion:     groupVersion,
 		MetaGroupVersion: apiGroupInfo.MetaGroupVersion,
 
-		ParameterCodec:        apiGroupInfo.ParameterCodec,
+		ParameterCodec: apiGroupInfo.ParameterCodec,
+		//这里会放入serializer
 		Serializer:            apiGroupInfo.NegotiatedSerializer,
 		Creater:               apiGroupInfo.Scheme,
 		Convertor:             apiGroupInfo.Scheme,

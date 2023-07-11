@@ -84,6 +84,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 		}
 
 		gv := scope.Kind.GroupVersion()
+		//基于scope做出来s
 		s, err := negotiation.NegotiateInputSerializer(req, false, scope.Serializer)
 		if err != nil {
 			scope.err(err, w, req)
@@ -123,6 +124,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 
 		decoder := scope.Serializer.DecoderToVersion(decodeSerializer, scope.HubGroupVersion)
 		span.AddEvent("About to convert to expected version")
+		//最终还是使用decoder基于http的body生成GVK
 		obj, gvk, err := decoder.Decode(body, &defaultGVK, original)
 		if err != nil {
 			strictError, isStrictError := runtime.AsStrictDecodingError(err)
@@ -179,6 +181,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 
 		span.AddEvent("About to store object in database")
 		admissionAttributes := admission.NewAttributesRecord(obj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, options, dryrun.IsDryRun(options.DryRun), userInfo)
+		//这里最终调用了r.Create，执行最终的store代码，r其实就是Store结构体
 		requestFunc := func() (runtime.Object, error) {
 			return r.Create(
 				ctx,

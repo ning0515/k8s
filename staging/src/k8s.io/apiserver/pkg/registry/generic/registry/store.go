@@ -166,6 +166,7 @@ type Store struct {
 	Decorator func(runtime.Object)
 
 	// CreateStrategy implements resource-specific behavior during creation.
+	//扩展点，可以在增删改查的时候增加自己的策略
 	CreateStrategy rest.RESTCreateStrategy
 	// BeginCreate is an optional hook that returns a "transaction-like"
 	// commit/revert function which will be called at the end of the operation,
@@ -418,7 +419,7 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 			finishCreate(ctx, false)
 		}()
 	}
-
+	//Create之前就会调用CreateStrategy
 	if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
 		return nil, err
 	}

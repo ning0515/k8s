@@ -54,11 +54,13 @@ type RESTCreateStrategy interface {
 	// status. Clear the status because status changes are internal. External
 	// callers of an api (users) should not be setting an initial status on
 	// newly created objects.
+	//对object做一些检验和修改
 	PrepareForCreate(ctx context.Context, obj runtime.Object)
 	// Validate returns an ErrorList with validation errors or nil.  Validate
 	// is invoked after default fields in the object have been filled in
 	// before the object is persisted.  This method should not mutate the
 	// object.
+	//对即将要创建的object做一个验证
 	Validate(ctx context.Context, obj runtime.Object) field.ErrorList
 	// WarningsOnCreate returns warnings to the client performing a create.
 	// WarningsOnCreate is invoked after default fields in the object have been filled in

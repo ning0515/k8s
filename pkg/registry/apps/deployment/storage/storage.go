@@ -85,6 +85,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter) (DeploymentStorage, error)
 }
 
 // REST implements a RESTStorage for Deployments.
+// 实际里面包含了generic的store，每个API Object都有对应的REST
 type REST struct {
 	*genericregistry.Store
 }

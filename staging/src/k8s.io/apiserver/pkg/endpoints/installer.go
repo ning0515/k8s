@@ -652,6 +652,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	kubeVerbs := map[string]struct{}{}
 	//把前面得到的各种信息，都放入reqScope中
 	reqScope := handlers.RequestScope{
+		//把Serializer放入reqScope
 		Serializer:      a.group.Serializer,
 		ParameterCodec:  a.group.ParameterCodec,
 		Creater:         a.group.Creater,
@@ -904,6 +905,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if isNamedCreater {
 				handler = restfulCreateNamedResource(namedCreater, reqScope, admit)
 			} else {
+				//制作handler时需要使用reqScope
 				handler = restfulCreateResource(creater, reqScope, admit)
 			}
 			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, handler)
