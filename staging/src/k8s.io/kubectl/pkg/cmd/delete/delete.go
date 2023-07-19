@@ -201,7 +201,7 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 			Unstructured().
 			ContinueOnError().
 			NamespaceParam(cmdNamespace).DefaultNamespace().
-			FilenameParam(enforceNamespace, &o.FilenameOptions).
+			FilenameParam(enforceNamespace, &o.FilenameOptions). //拿到了文件信息
 			LabelSelectorParam(o.LabelSelector).
 			FieldSelectorParam(o.FieldSelector).
 			SelectAllParam(o.DeleteAll).

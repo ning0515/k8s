@@ -65,6 +65,7 @@ func (o *FileNameFlags) AddFlags(flags *pflag.FlagSet) {
 	}
 
 	if o.Recursive != nil {
+		//递归操作，遍历一个文件夹下面的所有子文件，对这些文件都执行相同的操作
 		flags.BoolVarP(o.Recursive, "recursive", "R", *o.Recursive, "Process the directory used in -f, --filename recursively. Useful when you want to manage related manifests organized within the same directory.")
 	}
 	if o.Filenames != nil {

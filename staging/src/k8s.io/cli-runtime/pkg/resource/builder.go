@@ -248,8 +248,10 @@ func (b *Builder) FilenameParam(enforceNamespace bool, filenameOptions *Filename
 	paths := filenameOptions.Filenames
 	for _, s := range paths {
 		switch {
+		//第一种如果使用kubectl delete -f -命令，可以从stdin输入
 		case s == "-":
 			b.Stdin()
+		//第二种，可以从链接获取文件
 		case strings.Index(s, "http://") == 0 || strings.Index(s, "https://") == 0:
 			url, err := url.Parse(s)
 			if err != nil {
@@ -257,6 +259,7 @@ func (b *Builder) FilenameParam(enforceNamespace bool, filenameOptions *Filename
 				continue
 			}
 			b.URL(defaultHttpGetAttempts, url)
+		//默认是从文件获取数据
 		default:
 			matches, err := expandIfFilePattern(s)
 			if err != nil {

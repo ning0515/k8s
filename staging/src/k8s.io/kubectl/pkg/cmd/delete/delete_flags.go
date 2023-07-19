@@ -56,6 +56,7 @@ func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams generic
 	}
 
 	// add filename options
+	//如果使用了-f，这里就拿到了使用文件的标记
 	if f.FileNameFlags != nil {
 		options.FilenameOptions = f.FileNameFlags.ToOptions()
 	}
@@ -110,7 +111,7 @@ func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams generic
 }
 
 func (f *DeleteFlags) AddFlags(cmd *cobra.Command) {
-	f.FileNameFlags.AddFlags(cmd.Flags())
+	f.FileNameFlags.AddFlags(cmd.Flags()) //这里设置了是否从文件中读取
 	if f.LabelSelector != nil {
 		cmdutil.AddLabelSelectorFlagVar(cmd, f.LabelSelector)
 	}
