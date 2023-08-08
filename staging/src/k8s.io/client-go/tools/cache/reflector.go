@@ -50,11 +50,15 @@ const defaultExpectedTypeName = "<unspecified>"
 // Reflector watches a specified resource and causes all changes to be reflected in the given store.
 type Reflector struct {
 	// name identifies this reflector. By default it will be a file:line if possible.
+	// 名字标记了这个反射器的名字，默认值是所在的文件名:行数(比如reflector.go:125),默认值由GetNameFromCallsite生成
+	// 还有用这种方式指定name的,用于确定是哪个资源的缓存reflectorName := "storage/cacher.go:" + config.ResourcePrefix
 	name string
 	// The name of the type we expect to place in the store. The name
 	// will be the stringification of expectedGVK if provided, and the
 	// stringification of expectedType otherwise. It is for display
 	// only, and should not be used for parsing or comparison.
+	// 期望放到Store中的类型名称，如果提供，则是expectedGVK的字符串形式
+	// 否则就是expectedType的字符串，仅仅用于显示,不用于比较和解析
 	typeDescription string
 	// An example object of the type we expect to place in the store.
 	// Only the type needs to be right, except that when that is
@@ -319,6 +323,7 @@ func (r *Reflector) resyncChan() (<-chan time.Time, func() bool) {
 // ListAndWatch first lists all items and get the resource version at the moment of call,
 // and then use the resource version to watch.
 // It returns error if ListAndWatch didn't even try to initialize watch.
+// Reflector的核心
 func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	klog.V(3).Infof("Listing and watching %v from %s", r.typeDescription, r.name)
 	var err error

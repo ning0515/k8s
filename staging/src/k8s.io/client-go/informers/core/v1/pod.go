@@ -81,10 +81,11 @@ func (f *podInformer) defaultInformer(client kubernetes.Interface, resyncPeriod 
 	return NewFilteredPodInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
+//通过InformerFor获得podInformer实例
 func (f *podInformer) Informer() cache.SharedIndexInformer {
 	return f.factory.InformerFor(&corev1.Pod{}, f.defaultInformer)
 }
-
+//获取podInformer实例的Indexer，之后实例化PodListener，提供List和Pods功能
 func (f *podInformer) Lister() v1.PodLister {
 	return v1.NewPodLister(f.Informer().GetIndexer())
 }

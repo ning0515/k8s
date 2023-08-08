@@ -58,9 +58,11 @@ type sharedInformerFactory struct {
 	namespace        string
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 	lock             sync.Mutex
+	// 工厂级别(所有informer)默认的resync时间
 	defaultResync    time.Duration
+	// 每个informer具体的resync时间
 	customResync     map[reflect.Type]time.Duration
-
+	// informer实例的map
 	informers map[reflect.Type]cache.SharedIndexInformer
 	// startedInformers is used for tracking which informers have been started.
 	// This allows Start() to be called multiple times safely.
@@ -186,21 +188,25 @@ func (f *sharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) map[ref
 
 // InternalInformerFor returns the SharedIndexInformer for obj using an internal
 // client.
+// 共享机制 通过InformerFor来完成
 func (f *sharedInformerFactory) InformerFor(obj runtime.Object, newFunc internalinterfaces.NewInformerFunc) cache.SharedIndexInformer {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
 	informerType := reflect.TypeOf(obj)
+	// 如果已经有informer实例 就直接返回该实例
 	informer, exists := f.informers[informerType]
 	if exists {
 		return informer
 	}
 
 	resyncPeriod, exists := f.customResync[informerType]
+	// 如果不存在该类型的informer
+	// 1. 设置informer的resync时间
 	if !exists {
 		resyncPeriod = f.defaultResync
 	}
-
+	// 2. 实例化该informer
 	informer = newFunc(f.client, resyncPeriod)
 	f.informers[informerType] = informer
 
