@@ -294,7 +294,6 @@ func (o *DeleteOptions) RunDelete(f cmdutil.Factory) error {
 }
 
 func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
-	var input string
 	found := 0
 	if o.IgnoreNotFound {
 		r = r.IgnoreErrors(errors.IsNotFound)
@@ -305,23 +304,6 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 	err := r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
-		}
-		if info.Mapping.GroupVersionKind.Kind == "Namespace" {
-			fmt.Fprintf(o.Out, "Warning: This deletes everything under the namespace!\n")
-			for {
-				fmt.Fprintf(o.Out, "please enter 'y' to confirm or 'n' to cancel: ")
-				fmt.Fscanln(o.In, &input)
-				input = strings.ToLower(input)
-				if input == "y" {
-					fmt.Fprintf(o.Out, "Confirmed\n")
-					break
-				} else if input == "n" {
-					fmt.Fprintf(o.Out, "Canceled\n")
-					return nil
-				} else {
-					fmt.Fprintf(o.Out, "Invalid input, please try again\n")
-				}
-			}
 		}
 		deletedInfos = append(deletedInfos, info)
 		found++
