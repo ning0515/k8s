@@ -351,9 +351,6 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 	if err != nil {
 		return err
 	}
-	if input == "n" {
-		return nil
-	}
 	if found == 0 {
 		fmt.Fprintf(o.Out, "No resources found\n")
 		return nil
