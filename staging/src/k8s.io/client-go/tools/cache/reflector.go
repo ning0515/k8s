@@ -432,13 +432,19 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 				return err
 			}
 		}
-
+		// 开始watch
+		//整个watch包在一个for死循环中，具体的watch行为通过watchHandler函数来实现，其内部循环监听watch对象
+		//（由listerWatcher.Watch产生）的ResultChan。 如果发来evenet，并且没有出错，就按照四种类型进行处理：
+		//分别为Added、Modified、Deleted、Bookmark，表示有Obj被：添加、修改、删除，以及版本更新。
+		//之后对于前三种类型， 分别调用store(DeltaFIFO)的Add、Update、Delete方法，
+		//向DeltaFIFO中添加DeltaType为Added、Updated、Deleted的Delta。后续通过Pop函数中的HandleDeltas消费这些Deltas。
 		err = watchHandler(start, w, r.store, r.expectedType, r.expectedGVK, r.name, r.typeDescription, r.setLastSyncResourceVersion, nil, r.clock, resyncerrc, stopCh)
 		// Ensure that watch will not be reused across iterations.
 		w.Stop()
 		w = nil
 		retry.After(err)
 		if err != nil {
+			// 如果不是stopCh发来的主动停止，就记录日志
 			if err != errorStopRequested {
 				switch {
 				case isExpiredError(err):
@@ -461,6 +467,7 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 					klog.Warningf("%s: watch of %v ended with: %v", r.name, r.typeDescription, err)
 				}
 			}
+			// 注意这里返回的为nil，结合BackoffUntil函数看
 			return nil
 		}
 	}

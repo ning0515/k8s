@@ -825,6 +825,8 @@ func (p *sharedProcessor) shouldResync() bool {
 
 	resyncNeeded := false
 	now := p.clock.Now()
+	// 遍历所有的Listener，将同步时间已经到了的
+	// Listener加入syncingListeners
 	for listener := range p.listeners {
 		// need to loop through all the listeners to see if they need to resync so we can prepare any
 		// listeners that are going to be resyncing.

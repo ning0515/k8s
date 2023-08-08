@@ -71,6 +71,12 @@ func (i *storeIndex) reset() {
 	i.indices = Indices{}
 }
 
+// 可能的值举例
+// indexName=namespace
+// indexedValues = [kube-system]
+// indexFunc = "k8s.io/client-go/tools/cache.MetaNamespaceIndexFunc"
+// obj = &ObjectMeta{Name:,GenerateName:, Namespace:kube-system,SelfLink:,UID:,ResourceVersion:,Generation:0,CreationTimestamp:0001-01-01 00:00:00 +0000 UTC,DeletionTimestamp:<nil>,DeletionGracePeriodSeconds:nil,Labels:map[string]string{},Annotations:map[string]string{},OwnerReferences:[]OwnerReference{},Finalizers:[],ManagedFields:[]ManagedFieldsEntry{},}
+// storeKeySet = sets.String{"kube-system/coredns-7569857846-pgq8n":sets.Empty{}}
 func (i *storeIndex) getKeysFromIndex(indexName string, obj interface{}) (sets.String, error) {
 	indexFunc := i.indexers[indexName]
 	if indexFunc == nil {
@@ -87,6 +93,7 @@ func (i *storeIndex) getKeysFromIndex(indexName string, obj interface{}) (sets.S
 	if len(indexedValues) == 1 {
 		// In majority of cases, there is exactly one value matching.
 		// Optimize the most common path - deduping is not needed here.
+		//大部分情况下都是走这里，indexedValues只有一个值
 		storeKeySet = index[indexedValues[0]]
 	} else {
 		// Need to de-dupe the return list.
@@ -98,7 +105,6 @@ func (i *storeIndex) getKeysFromIndex(indexName string, obj interface{}) (sets.S
 			}
 		}
 	}
-
 	return storeKeySet, nil
 }
 
@@ -207,10 +213,12 @@ func (i *storeIndex) deleteKeyFromIndex(key, indexValue string, index Index) {
 
 // threadSafeMap implements ThreadSafeStore
 type threadSafeMap struct {
-	lock  sync.RWMutex
+	lock sync.RWMutex
+	//存储数据
 	items map[string]interface{}
 
 	// index implements the indexing functionality
+	// indexers来存储索引方法、indices来存储索引
 	index *storeIndex
 }
 

@@ -136,11 +136,14 @@ func SplitMetaNamespaceKey(key string) (namespace, name string, err error) {
 
 // `*cache` implements Indexer in terms of a ThreadSafeStore and an
 // associated KeyFunc.
+// cache.cache结构体实际上就是一个indexer
 type cache struct {
 	// cacheStorage bears the burden of thread safety for the cache
+	// ThreadSafeStore由 threadSafeMap 实现
 	cacheStorage ThreadSafeStore
 	// keyFunc is used to make the key for objects stored in and retrieved from items, and
 	// should be deterministic.
+	//默认使用 MetaNamespaceKeyFunc 也即是key为namespace/name
 	keyFunc KeyFunc
 }
 

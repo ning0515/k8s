@@ -707,11 +707,11 @@ func (f *DeltaFIFO) Replace(list []interface{}, _ string) error {
 func (f *DeltaFIFO) Resync() error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
-
+	// knownObjects可以理解为Indexer
 	if f.knownObjects == nil {
 		return nil
 	}
-
+	// 将Indexer中所有的obj刷到DeltaFIFO中
 	keys := f.knownObjects.ListKeys()
 	for _, k := range keys {
 		if err := f.syncKeyLocked(k); err != nil {
@@ -722,6 +722,7 @@ func (f *DeltaFIFO) Resync() error {
 }
 
 func (f *DeltaFIFO) syncKeyLocked(key string) error {
+	// 通过key在Indexer中获得obj
 	obj, exists, err := f.knownObjects.GetByKey(key)
 	if err != nil {
 		klog.Errorf("Unexpected error %v during lookup of key %v, unable to queue object for sync", err, key)
@@ -735,14 +736,16 @@ func (f *DeltaFIFO) syncKeyLocked(key string) error {
 	// we ignore the Resync for it. This is to avoid the race, in which the resync
 	// comes with the previous value of object (since queueing an event for the object
 	// doesn't trigger changing the underlying store <knownObjects>.
+	// 计算DeltaFIFO中Obj的key
 	id, err := f.KeyOf(obj)
 	if err != nil {
 		return KeyError{obj, err}
 	}
+	// 如果在items中已经存在该obj，就不需要再添加了
 	if len(f.items[id]) > 0 {
 		return nil
 	}
-
+	// 如果在items中没有该obj，就添加Sync类型的Deltas
 	if err := f.queueActionLocked(Sync, obj); err != nil {
 		return fmt.Errorf("couldn't queue object: %v", err)
 	}

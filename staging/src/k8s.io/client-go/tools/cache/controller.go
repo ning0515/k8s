@@ -354,6 +354,9 @@ func DeletionHandlingMetaNamespaceKeyFunc(obj interface{}) (string, error) {
 //     long as possible (until the upstream source closes the watch or times out,
 //     or you stop the controller).
 //   - h is the object you want notifications sent to.
+//
+// 在controller的NewInformer中
+// 在新建Informer时调用NewStore创建indexer，并调用newInformer
 func NewInformer(
 	lw ListerWatcher,
 	objType runtime.Object,
@@ -386,7 +389,7 @@ func NewIndexerInformer(
 	objType runtime.Object,
 	resyncPeriod time.Duration,
 	h ResourceEventHandler,
-	indexers Indexers,
+	indexers Indexers, //这里使用的时候可以直接传递一个空的cache.Indexers{}
 ) (Indexer, Controller) {
 	// This will hold the client state, as we know it.
 	clientState := NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers)
@@ -484,6 +487,8 @@ func processDeltas(
 //     or you stop the controller).
 //   - h is the object you want notifications sent to.
 //   - clientState is the store you want to populate
+//
+// newInformer中将indexer赋值给DeltaFIFO中的KnownObjects
 func newInformer(
 	lw ListerWatcher,
 	objType runtime.Object,

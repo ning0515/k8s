@@ -37,25 +37,43 @@ type Indexer interface {
 	// Index returns the stored objects whose set of indexed values
 	// intersects the set of indexed values of the given object, for
 	// the named index
+
+	// Indexers map[string]IndexFunc
+	// Indexers是一群索引函数的集合,键是索引器的名字,例如namespace,值是索引函数，例如cache.MetaNamespaceIndexFunc
+	// 通过indexers[indexName]获得indexFunc，通过indexFunc(obj)获得indexValues,例如： indexedValues = [kube-system]
+	// storeKeySet = index[indexedValues[0]]
+	// 通过Indices[indexName]获得对应的Index，最后返回Index[indexValues]中对应的所有资源对象的key
+	// 注意indexValues可以为数组
+	// indexName 是索引器的名字
+	// index最后获得的就是类似&threadSafeMap{items map[string]interface{}: "kube-system/coredns-7569857846-pgq8n"}下面的值
+	// 部分情况下也就是命名空间对应的资源名称下面的资源列表,item的键来自于index[indexedValues[0]]
 	Index(indexName string, obj interface{}) ([]interface{}, error)
 	// IndexKeys returns the storage keys of the stored objects whose
 	// set of indexed values for the named index includes the given
 	// indexed value
+	// 通过Indices[indexName]获得对应的Index，之后获得Index[indexValues]，
+	// 并排序得到有序key集合
+	// indexFunc := indexers[indexName]
 	IndexKeys(indexName, indexedValue string) ([]string, error)
 	// ListIndexFuncValues returns all the indexed values of the given index
+	// 获得该IndexName对应的所有Index中的index_key集合
 	ListIndexFuncValues(indexName string) []string
 	// ByIndex returns the stored objects whose set of indexed values
 	// for the named index includes the given indexed value
+	// 返回Index中对应indexedValue的obj集合
 	ByIndex(indexName, indexedValue string) ([]interface{}, error)
 	// GetIndexers return the indexers
+	// 返回indexers
 	GetIndexers() Indexers
 
 	// AddIndexers adds more indexers to this store.  If you call this after you already have data
 	// in the store, the results are undefined.
+	// 添加Indexer
 	AddIndexers(newIndexers Indexers) error
 }
 
 // IndexFunc knows how to compute the set of indexed values for an object.
+// 如果索引器是namespace的话，索引函数就可以根据具体的obj，计算出对应的命名空间切片，如 indexedValues = [kube-system]
 type IndexFunc func(obj interface{}) ([]string, error)
 
 // IndexFuncToKeyFuncAdapter adapts an indexFunc to a keyFunc.  This is only useful if your index function returns
@@ -92,10 +110,13 @@ func MetaNamespaceIndexFunc(obj interface{}) ([]string, error) {
 }
 
 // Index maps the indexed value to a set of keys in the store that match on that value
+// 举例：key是具体的命名空间,值是namespace/name集合
 type Index map[string]sets.String
 
 // Indexers maps a name to an IndexFunc
+// 举例：Key是索引器的名字，比如命名空间，值是对应的函数，可以将具体的资源对象所在的命名空间列表返回，返回以后可以给Index当KEY使用
 type Indexers map[string]IndexFunc
 
 // Indices maps a name to an Index
+// 举例：key是索引器的名字，如namespace，值是根据索引器计算出来的Index
 type Indices map[string]Index
