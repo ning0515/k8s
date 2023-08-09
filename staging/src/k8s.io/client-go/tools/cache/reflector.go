@@ -68,29 +68,37 @@ type Reflector struct {
 	// The GVK of the object we expect to place in the store if unstructured.
 	expectedGVK *schema.GroupVersionKind
 	// The destination to sync up with the watch source
+	//存储接口,具体由 DeltaFIFO 实现存储
 	store Store
 	// listerWatcher is used to perform lists and watches.
+	// 用来从 apiserver 拉取全量和增量资源
 	listerWatcher ListerWatcher
 	// backoff manages backoff of ListWatch
+	// 下面两个用来做失败重试
 	backoffManager wait.BackoffManager
 	// initConnBackoffManager manages backoff the initial connection with the Watch call of ListAndWatch.
 	initConnBackoffManager wait.BackoffManager
-	resyncPeriod           time.Duration
+	// informer 使用者重新同步的周期
+	resyncPeriod time.Duration
 	// clock allows tests to manipulate time
 	clock clock.Clock
 	// paginatedResult defines whether pagination should be forced for list calls.
 	// It is set based on the result of the initial list call.
+	// 是否要进行分页 List
 	paginatedResult bool
 	// lastSyncResourceVersion is the resource version token last
 	// observed when doing a sync with the underlying store
 	// it is thread safe, but not synchronized with the underlying store
+	// 最后同步的资源版本号，以此为依据，watch 只会监听大于此值的资源
 	lastSyncResourceVersion string
 	// isLastSyncResourceVersionUnavailable is true if the previous list or watch request with
 	// lastSyncResourceVersion failed with an "expired" or "too large resource version" error.
 	isLastSyncResourceVersionUnavailable bool
 	// lastSyncResourceVersionMutex guards read/write access to lastSyncResourceVersion
+	// 加把锁控制版本号
 	lastSyncResourceVersionMutex sync.RWMutex
 	// Called whenever the ListAndWatch drops the connection with an error.
+	// watch 失败回调 handler
 	watchErrorHandler WatchErrorHandler
 	// WatchListPageSize is the requested chunk size of initial and resync watch lists.
 	// If unset, for consistent reads (RV="") or reads that opt-into arbitrarily old data
@@ -99,8 +107,10 @@ type Reflector struct {
 	// NOTE: It should be used carefully as paginated lists are always served directly from
 	// etcd, which is significantly less efficient and may lead to serious performance and
 	// scalability problems.
+	// 每页大小
 	WatchListPageSize int64
 	// ShouldResync is invoked periodically and whenever it returns `true` the Store's Resync operation is invoked
+	// 判断是否满足可以重新同步的条件
 	ShouldResync func() bool
 	// MaxInternalErrorRetryDuration defines how long we should retry internal errors returned by watch.
 	MaxInternalErrorRetryDuration time.Duration

@@ -573,6 +573,7 @@ func determineResyncPeriod(desired, check time.Duration) time.Duration {
 
 const minimumResyncPeriod = 1 * time.Second
 
+// 如果调用AddEventHandler,就是使用的默认同步周期调用本函数,但是直接调用这个函数创建的listener,同步周期会不一样
 func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) (ResourceEventHandlerRegistration, error) {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
@@ -674,6 +675,7 @@ func (s *sharedIndexInformer) OnUpdate(old, new interface{}) {
 func (s *sharedIndexInformer) OnDelete(old interface{}) {
 	// Invocation of this function is locked under s.blockDeltas, so it is
 	// save to distribute the notification
+	// 把deleteNotification通知给每个Listener
 	s.processor.distribute(deleteNotification{oldObj: old}, false)
 }
 
@@ -703,6 +705,10 @@ func (s *sharedIndexInformer) RemoveEventHandler(handle ResourceEventHandlerRegi
 // subset of the listeners that (a) is recomputed in the occasional
 // calls to shouldResync and (b) every listener is initially put in.
 // The non-sync distributions go to every listener.
+// 维护了该 Infromer 上所有添加的 Listener，并负责将从 DeltaFIFO 中 POP 出的事件通知给所有的 Listener。
+// 这里有 2 种事件通知方式:
+// 1.对于 Sync 类型的事件只通知给需要 syncing 的 Listener。（NOTE：这里的 Sync 事件是指 old 和 new 对象的 resourceVersion一致，包括 Sync/Replaced Delta 类型）
+// 2.对于其余类型的事件，通知给所有的 Listener。
 type sharedProcessor struct {
 	listenersStarted bool
 	listenersLock    sync.RWMutex

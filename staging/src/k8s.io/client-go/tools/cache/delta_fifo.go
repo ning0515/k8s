@@ -100,38 +100,47 @@ type DeltaFIFOOptions struct {
 // different versions of the same object.
 type DeltaFIFO struct {
 	// lock/cond protects access to 'items' and 'queue'.
+	// 用来对'queue'、'items'、'closed'进行并发控制
 	lock sync.RWMutex
 	cond sync.Cond
 
 	// `items` maps a key to a Deltas.
 	// Each such Deltas has at least one Delta.
+	// key->Deltas的map结构，每一个Deltas包含至少一个Delta
 	items map[string]Deltas
 
 	// `queue` maintains FIFO order of keys for consumption in Pop().
 	// There are no duplicates in `queue`.
 	// A key is in `queue` if and only if it is in `items`.
+	// queue存储items中的key，保证FIFO特性，与items一一对应
 	queue []string
 
 	// populated is true if the first batch of items inserted by Replace() has been populated
 	// or Delete/Add/Update/AddIfNotPresent was called first.
+	// 标示第一批items已经到达。
 	populated bool
 	// initialPopulationCount is the number of items inserted by the first call of Replace()
+	// 第一批到达的items的个数，用来判断是否完成Sync（也即是最终减小为了0，就表示初始的同步做完了、FIFO保证处理顺序）
 	initialPopulationCount int
 
 	// keyFunc is used to make the key used for queued item
 	// insertion and retrieval, and should be deterministic.
+	// 生成Obj对应Key的方法
 	keyFunc KeyFunc
 
 	// knownObjects list keys that are "known" --- affecting Delete(),
 	// Replace(), and Resync()
+	// 本地存储，目前理解为Indexer
 	knownObjects KeyListerGetter
 
 	// Used to indicate a queue is closed so a control loop can exit when a queue is empty.
 	// Currently, not used to gate any of CRUD operations.
+	// 标示DeltaFIFO关闭了，会把现有的处理完
 	closed bool
 
 	// emitDeltaTypeReplaced is whether to emit the Replaced or Sync
 	// DeltaType when Replace() is called (to preserve backwards compat).
+	// 为tru表示当执行Replace操作时，Type为Replaced。为false时，不启用Replaced状态，使用Sync来代替。这是为了向后兼容。
 	emitDeltaTypeReplaced bool
 
 	// Called with every object if non-nil.
@@ -440,6 +449,7 @@ func isDeletionDup(a, b *Delta) *Delta {
 // queueActionLocked appends to the delta list for the object.
 // Caller must lock first.
 func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) error {
+	//计算obj对应的key，默认是namespace/name
 	id, err := f.KeyOf(obj)
 	if err != nil {
 		return KeyError{obj, err}
@@ -458,16 +468,19 @@ func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) err
 			return err
 		}
 	}
-
+	//通过key取出oldDeltas,与新的obj合并为newDeltas，并进行去重
 	oldDeltas := f.items[id]
 	newDeltas := append(oldDeltas, Delta{actionType, obj})
 	newDeltas = dedupDeltas(newDeltas)
 
 	if len(newDeltas) > 0 {
+		//如果item中不存在这个key对应的资源，就把key加入queue中，实际上说明queue中存储的key是和item的key一一对应的
 		if _, exists := f.items[id]; !exists {
 			f.queue = append(f.queue, id)
 		}
+		//更新items[key]为newDeltas
 		f.items[id] = newDeltas
+		//通过sync.cond的Broadcast通知所有消费者(POP)开始消费
 		f.cond.Broadcast()
 	} else {
 		// This never happens, because dedupDeltas never returns an empty list
@@ -575,24 +588,30 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 			f.cond.Wait()
 		}
 		isInInitialList := !f.hasSynced_locked()
+		//取queue里面的第一个数据作为id
 		id := f.queue[0]
+		//取出以后更新queue为从第二个数据开始
 		f.queue = f.queue[1:]
 		depth := len(f.queue)
+		//判断initialPopulationCount如果大于0就减1，表示在初始sync阶段
 		if f.initialPopulationCount > 0 {
 			f.initialPopulationCount--
 		}
+		//获取items[id]，记为item
 		item, ok := f.items[id]
 		if !ok {
 			// This should never happen
 			klog.Errorf("Inconceivable! %q was in f.queue but not f.items; ignoring.", id)
 			continue
 		}
+		//删除key是id的这一项
 		delete(f.items, id)
 		// Only log traces if the queue depth is greater than 10 and it takes more than
 		// 100 milliseconds to process one item from the queue.
 		// Queue depth never goes high because processing an item is locking the queue,
 		// and new items can't be added until processing finish.
 		// https://github.com/kubernetes/kubernetes/issues/103789
+		//特殊情况先不关注
 		if depth > 10 {
 			trace := utiltrace.New("DeltaFIFO Pop Process",
 				utiltrace.Field{Key: "ID", Value: id},
@@ -600,8 +619,10 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 				utiltrace.Field{Key: "Reason", Value: "slow event handlers blocking the queue"})
 			defer trace.LogIfLong(100 * time.Millisecond)
 		}
+		//调用process方法处理item：（该方法具体通过HandleDeltas实现，通过不同的操作类型，对indxer和Listener执行不同的操作）
 		err := process(item, isInInitialList)
 		if e, ok := err.(ErrRequeue); ok {
+			//如果process执行出错，调用addIfNotPresent，将id和items[id]重新放回queue和items中
 			f.addIfNotPresent(id, item)
 			err = e.Err
 		}

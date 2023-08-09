@@ -89,6 +89,8 @@ type ShouldResyncFunc func() bool
 type ProcessFunc func(obj interface{}, isInInitialList bool) error
 
 // `*controller` implements Controller
+// 一方面使用 ListerWatcher 从 ApiServer 拿取最新的事件（对象），并放入 DeltaFIFO 中，
+// 另一方面不停的 POP DeltaFIFO 中的对象。所有 POP 出来的 Deltas 事件都会被 ShardIndexInformer 内的 HandleDeltas 处理。
 type controller struct {
 	config         Config
 	reflector      *Reflector
@@ -453,7 +455,9 @@ func processDeltas(
 
 		switch d.Type {
 		case Sync, Replaced, Added, Updated:
+			//首先查看在indexer中是否能够get到该Ob
 			if old, exists, err := clientState.Get(obj); err == nil && exists {
+				//如果存在,就调用indexer的Update方法，更新本地存储
 				if err := clientState.Update(obj); err != nil {
 					return err
 				}
@@ -465,9 +469,11 @@ func processDeltas(
 				handler.OnAdd(obj, isInInitialList)
 			}
 		case Deleted:
+			//调用indexer的Delete方法，删除该obj
 			if err := clientState.Delete(obj); err != nil {
 				return err
 			}
+			//调用func (s *sharedIndexInformer) OnDelete(old interface{})
 			handler.OnDelete(obj)
 		}
 	}
