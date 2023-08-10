@@ -263,6 +263,22 @@ func NewSharedIndexInformer(lw ListerWatcher, exampleObject runtime.Object, defa
 // requested before the informer starts and the
 // options.ResyncPeriod given here and (b) the constant
 // `minimumResyncPeriod` defined in this file.
+//  pod对应的lw举例,
+//		&cache.ListWatch{
+//			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+//				if tweakListOptions != nil {
+//					tweakListOptions(&options)
+//				}
+//				return client.CoreV1().Pods(namespace).List(context.TODO(), options)
+//			},
+//			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+//				if tweakListOptions != nil {
+//					tweakListOptions(&options)
+//				}
+//				return client.CoreV1().Pods(namespace).Watch(context.TODO(), options)
+//			},
+//		}
+
 func NewSharedIndexInformerWithOptions(lw ListerWatcher, exampleObject runtime.Object, options SharedIndexInformerOptions) SharedIndexInformer {
 	realClock := &clock.RealClock{}
 

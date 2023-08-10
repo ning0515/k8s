@@ -144,6 +144,7 @@ type cache struct {
 	// keyFunc is used to make the key for objects stored in and retrieved from items, and
 	// should be deterministic.
 	//默认使用 MetaNamespaceKeyFunc 也即是key为namespace/name
+	//用于从obj生成key
 	keyFunc KeyFunc
 }
 
