@@ -98,7 +98,7 @@ func NewSharedInformerFactoryWithOptions(client clientset.Interface, defaultResy
 	factory := &sharedInformerFactory{
 		client:           client,
 		namespace:        v1.NamespaceAll,
-		defaultResync:    defaultResync,
+		defaultResync:    defaultResync,//最大一级的同步时间在这里设置
 		informers:        make(map[reflect.Type]cache.SharedIndexInformer),
 		startedInformers: make(map[reflect.Type]bool),
 		customResync:     make(map[reflect.Type]time.Duration),
@@ -121,6 +121,7 @@ func (f *sharedInformerFactory) Start(stopCh <-chan struct{}) {
 	}
 
 	for informerType, informer := range f.informers {
+		//f.informers map里面每种类型只有一个informer,如果已经有协程在跑了就跳过
 		if !f.startedInformers[informerType] {
 			f.wg.Add(1)
 			// We need a new variable in each loop iteration,

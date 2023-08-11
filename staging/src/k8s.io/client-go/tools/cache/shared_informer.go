@@ -590,6 +590,7 @@ func determineResyncPeriod(desired, check time.Duration) time.Duration {
 const minimumResyncPeriod = 1 * time.Second
 
 // 如果调用AddEventHandler,就是使用的默认同步周期调用本函数,但是直接调用这个函数创建的listener,同步周期会不一样
+// 目前同步周期还是跟informer factory一致
 func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) (ResourceEventHandlerRegistration, error) {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
@@ -597,13 +598,13 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEv
 	if s.stopped {
 		return nil, fmt.Errorf("handler %v was not added to shared informer because it has stopped already", handler)
 	}
-
+	//最小同步周期不能小于1s
 	if resyncPeriod > 0 {
 		if resyncPeriod < minimumResyncPeriod {
 			klog.Warningf("resyncPeriod %v is too small. Changing it to the minimum allowed value of %v", resyncPeriod, minimumResyncPeriod)
 			resyncPeriod = minimumResyncPeriod
 		}
-
+		//resyncCheckPeriod在实例化informer的时候设置的跟resyncPeriod是一样的
 		if resyncPeriod < s.resyncCheckPeriod {
 			if s.started {
 				klog.Warningf("resyncPeriod %v is smaller than resyncCheckPeriod %v and the informer has already started. Changing it to %v", resyncPeriod, s.resyncCheckPeriod, s.resyncCheckPeriod)
@@ -933,13 +934,14 @@ func newProcessListener(handler ResourceEventHandler, requestedResyncPeriod, res
 	ret := &processorListener{
 		nextCh:                make(chan interface{}),
 		addCh:                 make(chan interface{}),
-		handler:               handler,
+		handler:               handler, //handler是调用者传递的三个函数
 		syncTracker:           &synctrack.SingleFileTracker{UpstreamHasSynced: hasSynced},
 		pendingNotifications:  *buffer.NewRingGrowing(bufferSize),
 		requestedResyncPeriod: requestedResyncPeriod,
 		resyncPeriod:          resyncPeriod,
 	}
 
+	//将ret.nextResync设置成下个周期
 	ret.determineNextResync(now)
 
 	return ret

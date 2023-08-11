@@ -55,7 +55,7 @@ func NewPodInformer(client kubernetes.Interface, namespace string, resyncPeriod 
 // NewFilteredPodInformer constructs a new informer for Pod type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-// 以pod为例,这里会实例化informer,最终被加入到informer factory的map中
+// 以pod为例,这里会实例化informer,最终被加入到informer factory的map中,这个informer的ListerWatcher就只针对corev1.Pod对象
 func NewFilteredPodInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{

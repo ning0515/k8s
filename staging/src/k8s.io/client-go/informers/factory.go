@@ -204,7 +204,8 @@ func (f *sharedInformerFactory) InformerFor(obj runtime.Object, newFunc internal
 
 	resyncPeriod, exists := f.customResync[informerType]
 	// 如果不存在该类型的informer
-	// 1. 设置informer的resync时间
+	// 1. 设置informer的resync时间,这里实际上时间就是factory实例化的时候提供的时间,
+	//也就是factory下面的每个informer一开始时间都是一致的
 	if !exists {
 		resyncPeriod = f.defaultResync
 	}
