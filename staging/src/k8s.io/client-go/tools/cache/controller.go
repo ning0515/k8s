@@ -455,7 +455,7 @@ func processDeltas(
 
 		switch d.Type {
 		case Sync, Replaced, Added, Updated:
-			//首先查看在indexer中是否能够get到该Ob
+			//首先查看在indexer中是否能够get到该Obj
 			if old, exists, err := clientState.Get(obj); err == nil && exists {
 				//如果存在,就调用indexer的Update方法，更新本地存储
 				if err := clientState.Update(obj); err != nil {

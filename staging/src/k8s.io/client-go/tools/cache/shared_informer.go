@@ -293,6 +293,7 @@ func NewSharedIndexInformerWithOptions(lw ListerWatcher, exampleObject runtime.O
 		clock:                           realClock,
 		cacheMutationDetector:           NewCacheMutationDetector(fmt.Sprintf("%T", exampleObject)),
 	}
+
 }
 
 // SharedIndexInformerOptions configures a sharedIndexInformer.
@@ -468,6 +469,8 @@ func (s *sharedIndexInformer) SetTransform(handler TransformFunc) error {
 	return nil
 }
 
+// 每个factory对应一个或多个sharedIndexInformer，每个inforemer只针对一个类型的资源
+// 每个informer有一个controller
 func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
@@ -475,6 +478,11 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 		klog.Warningf("The sharedIndexInformer has started, run more than once is not allowed")
 		return
 	}
+	//KnownObjects就是本地缓存
+	//&cache{
+	//		cacheStorage: NewThreadSafeStore(indexers, Indices{}),
+	//		keyFunc:      keyFunc,
+	//	}
 	fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
 		KnownObjects:          s.indexer,
 		EmitDeltaTypeReplaced: true,
@@ -483,13 +491,14 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 
 	cfg := &Config{
 		Queue:             fifo,
-		ListerWatcher:     s.listerWatcher,
-		ObjectType:        s.objectType,
-		ObjectDescription: s.objectDescription,
-		FullResyncPeriod:  s.resyncCheckPeriod,
+		ListerWatcher:     s.listerWatcher,     //针对特定类型的list和watch函数
+		ObjectType:        s.objectType,        //该类型的一个空实例
+		ObjectDescription: s.objectDescription, //可以为空，不重要
+		FullResyncPeriod:  s.resyncCheckPeriod, //=f.defaultResync不额外设置的话，所有informer的同步时间都与factory初始化时设置的一致，并被传递给cfg
 		RetryOnError:      false,
 		ShouldResync:      s.processor.shouldResync,
-
+		//会调用processDeltas方法，一共做两件事：
+		//1.
 		Process:           s.HandleDeltas,
 		WatchErrorHandler: s.watchErrorHandler,
 	}
@@ -635,6 +644,7 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEv
 
 	handle := s.processor.addListener(listener)
 	for _, item := range s.indexer.List() {
+		listener.add(addNotification{newObj: item, isInInitialList: true})
 		// Note that we enqueue these notifications with the lock held
 		// and before returning the handle. That means there is never a
 		// chance for anyone to call the handle's HasSynced method in a
@@ -673,6 +683,9 @@ func (s *sharedIndexInformer) OnUpdate(old, new interface{}) {
 	// If is a Sync event, isSync should be true
 	// If is a Replaced event, isSync is true if resource version is unchanged.
 	// If RV is unchanged: this is a Sync/Replaced event, so isSync is true
+	// 如果是同步事件，则 isSync 应为 true
+	// 如果是替换事件，则如果资源版本未更改，则 isSync 为 true。
+	// 如果 RV 未更改：这是一个同步/替换事件，因此 isSync 为 true
 
 	if accessor, err := meta.Accessor(new); err == nil {
 		if oldAccessor, err := meta.Accessor(old); err == nil {
@@ -800,6 +813,7 @@ func (p *sharedProcessor) distribute(obj interface{}, sync bool) {
 
 	for listener, isSyncing := range p.listeners {
 		switch {
+		//如果sync为假，说明资源版本变了，资源对象的状态就发生了改变，所有的listener都要进行处理
 		case !sync:
 			// non-sync messages are delivered to every listener
 			listener.add(obj)
@@ -976,7 +990,7 @@ func (p *processorListener) pop() {
 			if notification == nil { // No notification to pop (and pendingNotifications is empty)
 				// Optimize the case - skip adding to pendingNotifications
 				notification = notificationToAdd
-				nextCh = p.nextCh
+				nextCh = p.nextCh //现在p.nextCh 和nextCh是同一个管道了
 			} else { // There is already a notification waiting to be dispatched
 				p.pendingNotifications.WriteOne(notificationToAdd)
 			}

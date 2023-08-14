@@ -367,6 +367,8 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	resyncerrc := make(chan error, 1)
 	cancelCh := make(chan struct{})
 	defer close(cancelCh)
+	//这一步会把本地缓存中的数据重新放入到DeltaFIFO中,因为在处理 SharedInformer 事件回调时，
+	//可能存在处理失败的情况，定时的 Resync 让这些处理失败的事件有了重新 onUpdate 处理的机会。
 	go r.startResync(stopCh, cancelCh, resyncerrc)
 	return r.watch(w, stopCh, resyncerrc)
 }

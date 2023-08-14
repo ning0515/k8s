@@ -732,7 +732,7 @@ func (f *DeltaFIFO) Resync() error {
 	if f.knownObjects == nil {
 		return nil
 	}
-	// 将Indexer中所有的obj刷到DeltaFIFO中
+	// 将缓存threadSafeMap中的key都拿到,看DeltaFIFO中是否存在
 	keys := f.knownObjects.ListKeys()
 	for _, k := range keys {
 		if err := f.syncKeyLocked(k); err != nil {
@@ -742,8 +742,9 @@ func (f *DeltaFIFO) Resync() error {
 	return nil
 }
 
+// 这里的key就是本地缓存中的所有key依次通过这个方法传进来
 func (f *DeltaFIFO) syncKeyLocked(key string) error {
-	// 通过key在Indexer中获得obj
+	// 通过key在本地缓存中拿到资源对象
 	obj, exists, err := f.knownObjects.GetByKey(key)
 	if err != nil {
 		klog.Errorf("Unexpected error %v during lookup of key %v, unable to queue object for sync", err, key)
@@ -762,11 +763,12 @@ func (f *DeltaFIFO) syncKeyLocked(key string) error {
 	if err != nil {
 		return KeyError{obj, err}
 	}
-	// 如果在items中已经存在该obj，就不需要再添加了
+	// 如果发现 FIFO 队列中已经有相同 key 的 event 进来了，说明该资源对象有了新的事件通过watch得到
+	// 前面拿到的旧的本地缓存已经失效，因此不做 Resync 处理直接返回 nil
 	if len(f.items[id]) > 0 {
 		return nil
 	}
-	// 如果在items中没有该obj，就添加Sync类型的Deltas
+	// 把本地缓存重新放入DeltaFIFO中
 	if err := f.queueActionLocked(Sync, obj); err != nil {
 		return fmt.Errorf("couldn't queue object: %v", err)
 	}
